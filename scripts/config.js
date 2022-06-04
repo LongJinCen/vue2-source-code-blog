@@ -23,8 +23,9 @@ const weexFactoryPlugin = {
     return '}'
   }
 }
-
+// 路径映射，源码中也会使用 alias，会在构建时替换为相应的路径
 const aliases = require('./alias')
+// 例如下面
 const resolve = p => {
   const base = p.split('/')[0]
   if (aliases[base]) {
@@ -33,16 +34,16 @@ const resolve = p => {
     return path.resolve(__dirname, '../', p)
   }
 }
-
+// 所有的构建版本
 const builds = {
-  // Runtime only (CommonJS). Used by bundlers e.g. Webpack & Browserify
+  // Runtime only (CommonJS)
   'web-runtime-cjs': {
     entry: resolve('web/entry-runtime.js'),
     dest: resolve('dist/vue.runtime.common.js'),
     format: 'cjs',
     banner
   },
-  // Runtime+compiler CommonJS build (CommonJS)
+  // Runtime+compiler (CommonJS)
   'web-full-cjs': {
     entry: resolve('web/entry-runtime-with-compiler.js'),
     dest: resolve('dist/vue.common.js'),
@@ -50,15 +51,14 @@ const builds = {
     alias: { he: './entity-decoder' },
     banner
   },
-  // Runtime only (ES Modules). Used by bundlers that support ES Modules,
-  // e.g. Rollup & Webpack 2
+  // Runtime only (ES Modules)
   'web-runtime-esm': {
     entry: resolve('web/entry-runtime.js'),
     dest: resolve('dist/vue.runtime.esm.js'),
     format: 'es',
     banner
   },
-  // Runtime+compiler CommonJS build (ES Modules)
+  // Runtime+compiler (ES Modules)
   'web-full-esm': {
     entry: resolve('web/entry-runtime-with-compiler.js'),
     dest: resolve('dist/vue.esm.js'),
@@ -66,7 +66,7 @@ const builds = {
     alias: { he: './entity-decoder' },
     banner
   },
-  // runtime-only build (Browser)
+  // Runtime only (Browser)
   'web-runtime-dev': {
     entry: resolve('web/entry-runtime.js'),
     dest: resolve('dist/vue.runtime.js'),
@@ -74,7 +74,7 @@ const builds = {
     env: 'development',
     banner
   },
-  // runtime-only production build (Browser)
+  // Runtime only (Browser)
   'web-runtime-prod': {
     entry: resolve('web/entry-runtime.js'),
     dest: resolve('dist/vue.runtime.min.js'),
@@ -82,7 +82,7 @@ const builds = {
     env: 'production',
     banner
   },
-  // Runtime+compiler development build (Browser)
+  // Runtime+compiler development (Browser)
   'web-full-dev': {
     entry: resolve('web/entry-runtime-with-compiler.js'),
     dest: resolve('dist/vue.js'),
@@ -91,7 +91,7 @@ const builds = {
     alias: { he: './entity-decoder' },
     banner
   },
-  // Runtime+compiler production build  (Browser)
+  // Runtime+compiler production  (Browser)
   'web-full-prod': {
     entry: resolve('web/entry-runtime-with-compiler.js'),
     dest: resolve('dist/vue.min.js'),
@@ -168,6 +168,7 @@ const builds = {
   }
 }
 
+// 为前面 build 中配置的每一个版本，生成 rollup 配置
 function genConfig (name) {
   const opts = builds[name]
   const config = {
