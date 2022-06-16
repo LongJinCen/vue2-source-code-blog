@@ -28,6 +28,7 @@ export function initGlobalAPI (Vue: GlobalAPI) {
       )
     }
   }
+  // 将 ./config 中的 config 定义到 Vue.config 上
   Object.defineProperty(Vue, 'config', configDef)
 
   // exposed util methods.
@@ -43,7 +44,7 @@ export function initGlobalAPI (Vue: GlobalAPI) {
   Vue.set = set
   Vue.delete = del
   Vue.nextTick = nextTick
-
+  // Vue.options 也会被合并到 vim.$options 上去
   Vue.options = Object.create(null)
   ASSET_TYPES.forEach(type => {
     Vue.options[type + 's'] = Object.create(null)

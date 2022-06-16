@@ -30,9 +30,10 @@ export function initLifecycle (vm: Component) {
     while (parent.$options.abstract && parent.$parent) {
       parent = parent.$parent
     }
+    // 将当前实例 push 到父组件的 $children 中，建立父子组件之间的关系
     parent.$children.push(vm)
   }
-
+  // 指定当前组件的 parent 实例
   vm.$parent = parent
   vm.$root = parent ? parent.$root : vm
 
@@ -47,31 +48,51 @@ export function initLifecycle (vm: Component) {
   vm._isBeingDestroyed = false
 }
 
+/**
+ * vue 中，每个组件都是一个 Vue 实例，在创建组件树的过程中，是一个深度遍历的过程
+ * activeInstance 表示当前正在创建的实例，一直深度往下，当当前组件挂载完成之后，就会退出当前这一层，回
+ * 到上一层，所以 需要使用 prevActiveInstance 来记录上一层的 activeInstance，当当前这一层执行完了之后
+ * 回到上一层时，activeInstance 指向正确的实例
+ */
 export function lifecycleMixin (Vue: Class<Component>) {
+  /**
+   * 1. 初始化挂载和更新函数
+   * 2. _update 过程是递归的
+   *  - 根据 VNode 调用 createElement 创建真实 dom
+   *  - 当遇到 componet 的占位符 Vnode 时，调用 vnode.data.hook.init 对该组件进行初始化
+   *     - new vnode.componentOptions.Ctor
+   *     - 重新进入 new Vue 的流程
+   *     - 调用 _render，创建该组件的渲染 vnode，然后调用 _update 方法对其进行挂载，回到这里的第 2 步
+   * @param {*} vnode
+   */
   Vue.prototype._update = function (vnode: VNode, hydrating?: boolean) {
     const vm: Component = this
+    // 如果已经 mounted 了，那么调用 beforeUpdate 钩子
     if (vm._isMounted) {
       callHook(vm, 'beforeUpdate')
     }
+    // 上次渲染的真实 dom 节点， $el 表示真实的 dom 节点
+    // 第一次 mount 时，根 Vue 实例的 $el 即为挂载的节点，组件第一次 mount 时 $el 为空
     const prevEl = vm.$el
+    // 上次渲染的 vnode，第一次 mount 是 null
     const prevVnode = vm._vnode
+    // activeInstance 比较重要，用来建立父子组件之间的关系
     const prevActiveInstance = activeInstance
     activeInstance = vm
+    // 更新 vm._vnode 为本次渲染的 vnode，还有一个 $vnode，是一个占位符，$vnode 是 _vnode 的父 vnode
     vm._vnode = vnode
-    // Vue.prototype.__patch__ is injected in entry points
-    // based on the rendering backend used.
+    // 第一次渲染，也就是 mount
     if (!prevVnode) {
-      // initial render
+      // vm.$el 是真实的 patch 返回的 dom 节点
       vm.$el = vm.__patch__(
         vm.$el, vnode, hydrating, false /* removeOnly */,
         vm.$options._parentElm,
         vm.$options._refElm
       )
-      // no need for the ref nodes after initial patch
-      // this prevents keeping a detached DOM tree in memory (#5851)
+      // 在 mount 后，这两个值无用了， this prevents keeping a detached DOM tree in memory (#5851)
       vm.$options._parentElm = vm.$options._refElm = null
     } else {
-      // updates
+      // 更新流程
       vm.$el = vm.__patch__(prevVnode, vnode)
     }
     activeInstance = prevActiveInstance
@@ -79,6 +100,7 @@ export function lifecycleMixin (Vue: Class<Component>) {
     if (prevEl) {
       prevEl.__vue__ = null
     }
+    // 将创建该 dom 节点的实例挂载到 $el.__vue__ 上
     if (vm.$el) {
       vm.$el.__vue__ = vm
     }
@@ -86,6 +108,7 @@ export function lifecycleMixin (Vue: Class<Component>) {
     if (vm.$vnode && vm.$parent && vm.$vnode === vm.$parent._vnode) {
       vm.$parent.$el = vm.$el
     }
+    // updated hooks 由 scheduler 调用
     // updated hook is called by the scheduler to ensure that children are
     // updated in a parent's updated hook.
   }
@@ -141,12 +164,15 @@ export function lifecycleMixin (Vue: Class<Component>) {
   }
 }
 
+// mount 阶段调用该函数进行挂载
 export function mountComponent (
   vm: Component,
   el: ?Element,
   hydrating?: boolean
 ): Component {
+  // 如果是组件，那么它的父 vnode 是一个占位符 vnode，没有 el dom 节点
   vm.$el = el
+  // 如果没有 render ，默认给一个空的 render，并且基于警告
   if (!vm.$options.render) {
     vm.$options.render = createEmptyVNode
     if (process.env.NODE_ENV !== 'production') {
@@ -167,10 +193,12 @@ export function mountComponent (
       }
     }
   }
+  // 组件的 beforeMount 生命周期，还未创建组件的 vnode，即将执行 updateComponet 进行 render 和 patch
   callHook(vm, 'beforeMount')
 
+  // 定义渲染函数，这个函数在初始化挂载跟更新都会调用
   let updateComponent
-  /* istanbul ignore if */
+  // 开发环境下，还会利用 mark api 进行浏览器的性能 mark 标记
   if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
     updateComponent = () => {
       const name = vm._name
@@ -179,11 +207,13 @@ export function mountComponent (
       const endTag = `vue-perf-end:${id}`
 
       mark(startTag)
+      // 调用 render 函数进行 render
       const vnode = vm._render()
       mark(endTag)
       measure(`vue ${name} render`, startTag, endTag)
 
       mark(startTag)
+      // 进行挂载或者更新
       vm._update(vnode, hydrating)
       mark(endTag)
       measure(`vue ${name} patch`, startTag, endTag)
@@ -197,13 +227,17 @@ export function mountComponent (
   // we set this to vm._watcher inside the watcher's constructor
   // since the watcher's initial patch may call $forceUpdate (e.g. inside child
   // component's mounted hook), which relies on vm._watcher being already defined
+  // 实例化 watcher，每一个组件都会有一个 watcher，会在内部调用 updateComponent 函数
   new Watcher(vm, updateComponent, noop, null, true /* isRenderWatcher */)
   hydrating = false
 
   // manually mounted instance, call mounted on self
   // mounted is called for render-created child components in its inserted hook
+  // 注意这里的 mounted 只会触发 new Vue() 上注册 mounted，组件的 mounted 触发逻辑没有在这里
+  // 并且组件的 Mounted 后不代表其已经被渲染到页面上
   if (vm.$vnode == null) {
     vm._isMounted = true
+    // 挂载结束，触发 mounted 钩子
     callHook(vm, 'mounted')
   }
   return vm

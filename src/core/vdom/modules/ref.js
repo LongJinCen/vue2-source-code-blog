@@ -2,6 +2,7 @@
 
 import { remove, isDef } from 'shared/util'
 
+// 当 dom 中有 ref 时，向 vnode 当前所在的 vm 实例上的 $refs 属性中添加一个 ref，这样就能通过 this.$refs.xxx 进行访问
 export default {
   create (_: any, vnode: VNodeWithData) {
     registerRef(vnode)

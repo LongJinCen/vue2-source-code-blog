@@ -21,6 +21,7 @@ export function initAssetRegisters (Vue: GlobalAPI) {
         }
         if (type === 'component' && isPlainObject(definition)) {
           definition.name = definition.name || id
+          // 这里其实不用 extend 也可以，因为在使用该组件时，会为该组件创意一个构造器，只不过如果在这里创建了，后面再为该组件创建构造器时会直接返回缓存下来的这里创建的构造器
           definition = this.options._base.extend(definition)
         }
         if (type === 'directive' && typeof definition === 'function') {

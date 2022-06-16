@@ -111,6 +111,7 @@ function initProps (vm: Component, propsOptions: Object) {
 
 function initData (vm: Component) {
   let data = vm.$options.data
+  // 将返回的 data 挂载到实例 vim._data 上
   data = vm._data = typeof data === 'function'
     ? getData(data, vm)
     : data || {}
@@ -124,6 +125,7 @@ function initData (vm: Component) {
   }
   // proxy data on instance
   const keys = Object.keys(data)
+  // 会检查 data 中的 key 是否在 props 和 methods 中声明了，如果声明了那么警告
   const props = vm.$options.props
   const methods = vm.$options.methods
   let i = keys.length
@@ -143,6 +145,7 @@ function initData (vm: Component) {
         `Use prop default value instead.`,
         vm
       )
+    // data 返回的对象都会被放到 vim._data 上，这里做了一个代理，使得 vim.key 代理到 vim._data.key 上
     } else if (!isReserved(key)) {
       proxy(vm, `_data`, key)
     }
@@ -168,12 +171,15 @@ const computedWatcherOptions = { lazy: true }
 
 function initComputed (vm: Component, computed: Object) {
   // $flow-disable-line
+  // 为 computed 创建 watcher，并统一挂载到 vm._computedWatchers 上
   const watchers = vm._computedWatchers = Object.create(null)
   // computed properties are just getters during SSR
   const isSSR = isServerRendering()
 
   for (const key in computed) {
+    // computed key 对应的函数
     const userDef = computed[key]
+    // computed 可以通过 get、set 的方式定义，这里需要兼容一下
     const getter = typeof userDef === 'function' ? userDef : userDef.get
     if (process.env.NODE_ENV !== 'production' && getter == null) {
       warn(
@@ -184,9 +190,10 @@ function initComputed (vm: Component, computed: Object) {
 
     if (!isSSR) {
       // create internal watcher for the computed property.
+      // 为每个 computed property 创建一个 watcher
       watchers[key] = new Watcher(
         vm,
-        getter || noop,
+        getter || noop, // 传递的是 computed 的函数
         noop,
         computedWatcherOptions
       )
@@ -196,6 +203,7 @@ function initComputed (vm: Component, computed: Object) {
     // component prototype. We only need to define computed properties defined
     // at instantiation here.
     if (!(key in vm)) {
+      // 将 computed 定义到 vm 上，方便访问
       defineComputed(vm, key, userDef)
     } else if (process.env.NODE_ENV !== 'production') {
       if (key in vm.$data) {
@@ -207,11 +215,13 @@ function initComputed (vm: Component, computed: Object) {
   }
 }
 
+// 在 vm 上定义computed property
 export function defineComputed (
   target: any,
   key: string,
   userDef: Object | Function
 ) {
+  // shouldCache 为 true
   const shouldCache = !isServerRendering()
   if (typeof userDef === 'function') {
     sharedPropertyDefinition.get = shouldCache
@@ -237,19 +247,30 @@ export function defineComputed (
       )
     }
   }
+  // 通过 Object.defineProperty 进行定义
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
 
+// 创建 computed property 的 getter 函数
 function createComputedGetter (key) {
+  // 返回一个函数，当访问 key 这个 computed property 时，会执行下面的逻辑
   return function computedGetter () {
+    // 根据 Key 拿到这个 computed property 的 watcher
     const watcher = this._computedWatchers && this._computedWatchers[key]
     if (watcher) {
+      // watcher.dirty 为 true，因为 computed watcher 在创建时会传递 lazy 属性为 true，dirty = lazy，表示第一次初始化 watcher 时不求值
+      // computed property 是访问时才求值
       if (watcher.dirty) {
         watcher.evaluate()
       }
+      // 当 watcher.evaluate 执行时，当前全局的 watcher 即为当前的 computed watcher
+      // 执行完后，当前的全局 watcher 会变成其他的 wathcer，这里调用 watcher.depend() 的目的是，让 computed watcher 订阅的所有 dep
+      // 再订阅一次当前全局的 watcher，通常就是当前的渲染 watcher
+      // 也就是当我们改变 computed 计算函数依赖的属性时，会触发 computed watcher 进行重新计算，然后会再触发渲染 watcher 进行重新渲染
       if (Dep.target) {
         watcher.depend()
       }
+      // 返回 computed 计算出来的新值
       return watcher.value
     }
   }
@@ -332,6 +353,7 @@ export function stateMixin (Vue: Class<Component>) {
       warn(`$props is readonly.`, this)
     }
   }
+  // 代理 $data 到 _data，代理 $props 到 _props
   Object.defineProperty(Vue.prototype, '$data', dataDef)
   Object.defineProperty(Vue.prototype, '$props', propsDef)
 

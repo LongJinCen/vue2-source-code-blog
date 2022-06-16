@@ -19,7 +19,7 @@ import { patch } from './patch'
 import platformDirectives from './directives/index'
 import platformComponents from './components/index'
 
-// install platform specific utils
+// web 平台专用工具函数
 Vue.config.mustUseProp = mustUseProp
 Vue.config.isReservedTag = isReservedTag
 Vue.config.isReservedAttr = isReservedAttr
@@ -27,13 +27,14 @@ Vue.config.getTagNamespace = getTagNamespace
 Vue.config.isUnknownElement = isUnknownElement
 
 // install platform runtime directives & components
+// 挂载到 Vue.options 上
 extend(Vue.options.directives, platformDirectives)
 extend(Vue.options.components, platformComponents)
 
-// install platform patch function
+// web 平台 patch 函数
 Vue.prototype.__patch__ = inBrowser ? patch : noop
 
-// public mount method
+// web 平台特定的 $mount
 Vue.prototype.$mount = function (
   el?: string | Element,
   hydrating?: boolean

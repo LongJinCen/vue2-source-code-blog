@@ -67,10 +67,11 @@ function createKeyToOldIdx (children, beginIdx, endIdx) {
   return map
 }
 
+// 不同的平台通过调用该函数，会返回一个 patch 函数，用于渲染阶段，根据 vnode，生成或者更改真实的 dom
 export function createPatchFunction (backend) {
   let i, j
   const cbs = {}
-
+  // 不同的平台在调用该函数时，传递各自的 nodeOps 和 modules
   const { modules, nodeOps } = backend
 
   for (i = 0; i < hooks.length; ++i) {
@@ -121,7 +122,9 @@ export function createPatchFunction (backend) {
   }
 
   let creatingElmInVPre = 0
-
+  /**
+   * 根据 vnode 创建 dom
+   */
   function createElm (
     vnode,
     insertedVnodeQueue,
@@ -141,6 +144,7 @@ export function createPatchFunction (backend) {
     }
 
     vnode.isRootInsert = !nested // for transition enter check
+    // 处理 vnode 是组件的情况，如果是组件，那么进入 createComponent 函数
     if (createComponent(vnode, insertedVnodeQueue, parentElm, refElm)) {
       return
     }
@@ -162,7 +166,7 @@ export function createPatchFunction (backend) {
           )
         }
       }
-
+      // 创建当前 vnode 的对应的 dom 节点，并挂载到 vnode.elm 上
       vnode.elm = vnode.ns
         ? nodeOps.createElementNS(vnode.ns, tag)
         : nodeOps.createElement(tag, vnode)
@@ -188,10 +192,19 @@ export function createPatchFunction (backend) {
           insert(parentElm, vnode.elm, refElm)
         }
       } else {
+        // 创建 child 的 vnode 对应的 dom
+        // 这里又开始了递归
         createChildren(vnode, children, insertedVnodeQueue)
+        /**
+         * children 创建完成后，
+         * 1. 如果有传递给当前 dom 节点的属性，那么会调用  src/platforms/web/runtime/modules/xxx 中定义的 create 钩子，对 data 中相应的数据
+         *  进行处理，例如当有 class 属性时，那么 style.js 中的 create 钩子就会读取 class 并添加到当前的 dom 节点上(vnode.elm)
+         * 2. 调用 data.hook 上的 create 钩子
+         */
         if (isDef(data)) {
           invokeCreateHooks(vnode, insertedVnodeQueue)
         }
+        // 当所有子节点创建完成后，将 vnode.elm 也添加到 parentElm 中，对于组件来说，当组件的真实 dom 创建完成后 这里的 parentElm 是空，因为组件的父节点是一个占位符 vnode，没有真实的dom节点，所以这里的 insert 不会执行真实的插入操作
         insert(parentElm, vnode.elm, refElm)
       }
 
@@ -207,10 +220,13 @@ export function createPatchFunction (backend) {
     }
   }
 
+  // 在为某个 Vue 实例创建 dom 节点时，发现有组件的 vnode，那么创建组件
   function createComponent (vnode, insertedVnodeQueue, parentElm, refElm) {
+    // 组件的 data.hook 是有值的，这里的 vnode 是之前创建的一个占位符 vnode，包含了 componentOptions 和 data.hook 这两个比较重要的属性
     let i = vnode.data
     if (isDef(i)) {
       const isReactivated = isDef(vnode.componentInstance) && i.keepAlive
+      // 进入组件的 init 方法，开始对组件进行实例化，在为某个组件创建 vnode 时，如果发现有组件 A，那么会为该组件 A 创建一个占位符 vnode，并且会为 A 创建一个新的构造函数，方便对其进行实例化
       if (isDef(i = i.hook) && isDef(i = i.init)) {
         i(vnode, false /* hydrating */, parentElm, refElm)
       }
@@ -219,7 +235,9 @@ export function createPatchFunction (backend) {
       // component also has set the placeholder vnode's elm.
       // in that case we can just return the element and be done.
       if (isDef(vnode.componentInstance)) {
+        // 这一行很重要
         initComponent(vnode, insertedVnodeQueue)
+        insert(parentElm, vnode.elm, refElm) // 这一行是我自己加的，当组件创建完毕后，会把组件的真实dom节点挂载到当前的占位符 vnode 上的 elm 属性，这样当组件自己内部挂载完成后，就会在占位符所在的组件内进行挂载了
         if (isTrue(isReactivated)) {
           reactivateComponent(vnode, insertedVnodeQueue, parentElm, refElm)
         }
@@ -233,7 +251,11 @@ export function createPatchFunction (backend) {
       insertedVnodeQueue.push.apply(insertedVnodeQueue, vnode.data.pendingInsert)
       vnode.data.pendingInsert = null
     }
+    // 将组件实例 patch 得到的 $el dom 节点赋值给占位符节点 vnode 的 elm 属性
+    // $el 是组件实例上的一个属性，表示组件的整体 dom，而 elm 是存在于 vnode 上的属性，表示每个 vnode 对应的 dom 节点
+    // 将当前 vnode push 到 insertedVnodeQueue 中
     vnode.elm = vnode.componentInstance.$el
+    // 调用占位符 vnode.data.hook 上的一些钩子，并且更新 insertedVnodeQueue
     if (isPatchable(vnode)) {
       invokeCreateHooks(vnode, insertedVnodeQueue)
       setScope(vnode)
@@ -282,12 +304,16 @@ export function createPatchFunction (backend) {
 
   function createChildren (vnode, children, insertedVnodeQueue) {
     if (Array.isArray(children)) {
+      // children 的 key 最好不要重复，dev 环境下回基于警告
       if (process.env.NODE_ENV !== 'production') {
         checkDuplicateKeys(children)
       }
+      // 递归调用 createElm
       for (let i = 0; i < children.length; ++i) {
+        // 一次创建每个 children，并且把刚刚创建的当前 vnode 的 dom 节点 vnode.elm 作为 children 的 parent
         createElm(children[i], insertedVnodeQueue, vnode.elm, null, true, children, i)
       }
+    // 如果没有 children，如果当前包含文本，那么创建文本节点，然后添加到 vnode.elm 中
     } else if (isPrimitive(vnode.text)) {
       nodeOps.appendChild(vnode.elm, nodeOps.createTextNode(String(vnode.text)))
     }
@@ -300,6 +326,8 @@ export function createPatchFunction (backend) {
     return isDef(vnode.tag)
   }
 
+  // 当组件 patch 成功后，会调用其占位符 vnode 上注册的 vnode.data.create 钩子，如果有 insert 钩子则
+  // push 到 insertedVnodeQueue 中，后面会统一调用
   function invokeCreateHooks (vnode, insertedVnodeQueue) {
     for (let i = 0; i < cbs.create.length; ++i) {
       cbs.create[i](emptyNode, vnode)
@@ -560,6 +588,7 @@ export function createPatchFunction (backend) {
   function invokeInsertHook (vnode, queue, initial) {
     // delay insert hooks for component root nodes, invoke them after the
     // element is really inserted
+    // 将当前 vnode 的 insertedVnodeQueue 更新到 insertedVnodeQueue 上
     if (isTrue(initial) && isDef(vnode.parent)) {
       vnode.parent.data.pendingInsert = queue
     } else {
@@ -680,7 +709,12 @@ export function createPatchFunction (backend) {
       return node.nodeType === (vnode.isComment ? 8 : 3)
     }
   }
-
+  // 该返回的 patch 函数，会被挂载到实例 vm.__patch__ 上，在渲染阶段会调用该函数，得到真实的 dom
+  // patch 是根据 vnode 创建真实的 dom，由于创建当前组件的 vnode 时，如果当前组件内部使用了其他组件 A，只会为 A
+  // 组件创建一个占位符 Vnode，并不会进一步去创建 A 的 Vnode，直到所有的子组件的 Vnode 的创建完毕，然后再来 patch，
+  // 换句话说当渲染页面时，并不是先一次性全量创建页面的所有的 vnode，而是层层递进，先创建第一层组件的 vnode，执行第一层组件的
+  // patch，在 patch 过程中发现了有应用其他组件 A，才会去实例化 A 组件，并且为 A 创建 vnode，然后执行其 path，换句话说
+  // 如果当前组件是否 patch 完成，完全依赖于子组件是否 patch 完成
   return function patch (oldVnode, vnode, hydrating, removeOnly, parentElm, refElm) {
     if (isUndef(vnode)) {
       if (isDef(oldVnode)) invokeDestroyHook(oldVnode)
@@ -689,12 +723,14 @@ export function createPatchFunction (backend) {
 
     let isInitialPatch = false
     const insertedVnodeQueue = []
-
+    // component 进行第一次挂载时，没有 oldVnode
     if (isUndef(oldVnode)) {
       // empty mount (likely as component), create new root element
       isInitialPatch = true
+      // 调用完成后，vnode 的 dom 便会挂载到 vnode.elm 上
       createElm(vnode, insertedVnodeQueue, parentElm, refElm)
     } else {
+      // oldVnode 是一个真实的 dom
       const isRealElement = isDef(oldVnode.nodeType)
       if (!isRealElement && sameVnode(oldVnode, vnode)) {
         // patch existing root node
@@ -724,14 +760,18 @@ export function createPatchFunction (backend) {
           }
           // either not server-rendered, or hydration failed.
           // create an empty node and replace it
+          // 由于 oldVnode 是一个 dom，这里需要创建一个 vnode
           oldVnode = emptyNodeAt(oldVnode)
         }
 
         // replacing existing element
+        // 前面调用 emptyNodeAt 的时候，把 oldVnode 也就是 dom，挂载到 oldVnode.elm 上了，这里的 oldElm 就是之前的 dom
         const oldElm = oldVnode.elm
+        // 根节点的父元素
         const parentElm = nodeOps.parentNode(oldElm)
 
         // create new node
+        // 调用完成后，vnode 的 dom 便会挂载到 vnode.elm 上
         createElm(
           vnode,
           insertedVnodeQueue,
@@ -773,6 +813,7 @@ export function createPatchFunction (backend) {
         }
 
         // destroy old node
+        // 需要把之前的旧的 node 从页面上移除调
         if (isDef(parentElm)) {
           removeVnodes(parentElm, [oldVnode], 0, 0)
         } else if (isDef(oldVnode.tag)) {
@@ -780,8 +821,14 @@ export function createPatchFunction (backend) {
         }
       }
     }
-
+    // 当组件 patch 完成后，调用其占位符 vnode 上的 data.hook.insert 钩子
+    // insertedVnodeQueue 是有值的，表示当前组件下还挂载了其他组件，其他组件的 insert 钩子还未调用
+    // 其他组件都会被 push 到 insertedVnodeQueue 中，当当前组件的 Patch 完成后，统一调用其他组件的 insert 钩子
+    // 注意这里的 isInitialPatch 很重要，isInitialPatch 当前是组件时，isInitialPatch 为 false，而当前是 new Vue 实例时 isInitialPatch 为 true
+    // isInitialPatch 为false时，才会一次去执行 insertedVnodeQueue 中记录的 vnode 中的 data.hook.insert（内部会调用组件的 mounted 钩子函数）
+    // 也就是组件的 mounted 是在根 Vue 实例（整个页面）都 mounted 之后才会执行
     invokeInsertHook(vnode, insertedVnodeQueue, isInitialPatch)
+    // vnode 通过 createElm 创建的 dom，会挂载到 vnode.elm 上
     return vnode.elm
   }
 }

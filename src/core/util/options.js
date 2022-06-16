@@ -25,6 +25,7 @@ import {
  * how to merge a parent option value and a child option
  * value into the final value.
  */
+// 用户可以配置 options 的合并策略，本文件中定义了内置的一些 vue 的特定的属性的合并策略，例如 data、watch、component 等等
 const strats = config.optionMergeStrategies
 
 /**
@@ -44,6 +45,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * Helper that recursively merges two data objects together.
+ */
+/**
+ * 深合并
  */
 function mergeData (to: Object, from: ?Object): Object {
   if (!from) return to
@@ -72,6 +76,7 @@ export function mergeDataOrFn (
 ): ?Function {
   if (!vm) {
     // in a Vue.extend merge, both should be functions
+    // childVal 和 paretnVal 只定义了其中一个
     if (!childVal) {
       return parentVal
     }
@@ -83,6 +88,7 @@ export function mergeDataOrFn (
     // merged result of both functions... no need to
     // check if parentVal is a function here because
     // it has to be a function to pass previous merges.
+    // 如果 childVal 和 ParetnVal 都定义了, 那么返回一个新的函数，这个新的函数返回 childVal 和 ParentVal 深合并后的结果
     return function mergedDataFn () {
       return mergeData(
         typeof childVal === 'function' ? childVal.call(this, this) : childVal,
@@ -107,12 +113,14 @@ export function mergeDataOrFn (
   }
 }
 
+// data 的合并策略，深合并，childVal 优先，返回一个新的函数
 strats.data = function (
   parentVal: any,
   childVal: any,
   vm?: Component
 ): ?Function {
   if (!vm) {
+    // 如果组件的 data 不是一个 funciton，会基于警告，并且返回 parentVal
     if (childVal && typeof childVal !== 'function') {
       process.env.NODE_ENV !== 'production' && warn(
         'The "data" option should be a function ' +
@@ -123,6 +131,7 @@ strats.data = function (
 
       return parentVal
     }
+    // 走到这里保证了 childVal 是一个 function
     return mergeDataOrFn(parentVal, childVal)
   }
 
@@ -145,6 +154,7 @@ function mergeHook (
     : parentVal
 }
 
+// 生命周期的合并策略：返回一个合并后的数组，parentVal 优先，即 mixin 和 extends 中的有限
 LIFECYCLE_HOOKS.forEach(hook => {
   strats[hook] = mergeHook
 })
@@ -170,7 +180,7 @@ function mergeAssets (
     return res
   }
 }
-
+// 组件、指令、filter 的合并策略：创建一个新的对象，并将 parentVal 挂载到对象的原型链上
 ASSET_TYPES.forEach(function (type) {
   strats[type + 's'] = mergeAssets
 })
@@ -181,6 +191,7 @@ ASSET_TYPES.forEach(function (type) {
  * Watchers hashes should not overwrite one
  * another, so we merge them as arrays.
  */
+// watch 合并策略，合并为一个数组，父中的 watch 优先
 strats.watch = function (
   parentVal: ?Object,
   childVal: ?Object,
@@ -363,25 +374,32 @@ function assertObjectType (name: string, value: any, vm: ?Component) {
  * Core utility used in both instantiation and inheritance.
  */
 export function mergeOptions (
-  parent: Object,
-  child: Object,
-  vm?: Component
+  parent: Object, // 父构造器上的 options，即 vm.constructor.super.options 通常是 Vue.options
+  child: Object, // 我们在 .vue 组件中写的 options，是一个对象，即一个组件
+  vm?: Component // 有 vm 的时候是在 new Vue 的时候, 没有 vm 的时候是在为组件创建构造器的时候
 ): Object {
+  // 检查组件的名称是否符合要求
   if (process.env.NODE_ENV !== 'production') {
     checkComponents(child)
   }
-
+  // 如果是一个函数组件，那么它的 options 挂载在自生的 options 属性上
   if (typeof child === 'function') {
     child = child.options
   }
-
+  // 将组件中书写的 props、inject、directive 进行格式统一化
   normalizeProps(child, vm)
   normalizeInject(child, vm)
   normalizeDirectives(child)
+  // https://v2.vuejs.org/v2/api/#extends
+  // 组件中可以通过 extends 这个配置，指定当前组件继承其他的组件
   const extendsFrom = child.extends
+  // 如果有 extends 和 mixins，由于是混入，那么将 extends 和 mixin 与构造器 parent 进行合并等到合并后的 paret
+  // 然后再与当前的 child 的配置进行合并，总体来说就是 child 的配置优先级高于 parent，如果 extends 或者 mixin 中还有
+  // extends 和 Mixin，那么将递归的进行合并
   if (extendsFrom) {
     parent = mergeOptions(parent, extendsFrom, vm)
   }
+  // mixin 其实是跟 extends 类似的，都是继承一份组件的配置
   if (child.mixins) {
     for (let i = 0, l = child.mixins.length; i < l; i++) {
       parent = mergeOptions(parent, child.mixins[i], vm)
@@ -389,6 +407,7 @@ export function mergeOptions (
   }
   const options = {}
   let key
+  // 整体的合并策略是优先取子组件中的属性
   for (key in parent) {
     mergeField(key)
   }
@@ -408,6 +427,10 @@ export function mergeOptions (
  * Resolve an asset.
  * This function is used because child instances need access
  * to assets defined in its ancestor chain.
+ */
+/**
+ * 先在当前组件内找有没有自定义的相关 id，由于组件是会继承父构造器的 options 的，所以如果在自生的 options 中
+ * 没找到时，就会沿着 __proto__ 往上找
  */
 export function resolveAsset (
   options: Object,

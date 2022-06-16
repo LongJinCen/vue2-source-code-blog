@@ -4,6 +4,10 @@ import config from '../config'
 import { warn } from './debug'
 import { inBrowser, inWeex } from './env'
 
+/**
+ * errorCaptured 函数的处理逻辑，会从当前组件往上找，找到第一个 errorCaptured 函数，就调用它
+ * 如果 errorCapture 函数执行出错，就调用全局的 globalHandleError
+ */
 export function handleError (err: Error, vm: any, info: string) {
   if (vm) {
     let cur = vm
@@ -24,6 +28,9 @@ export function handleError (err: Error, vm: any, info: string) {
   globalHandleError(err, vm, info)
 }
 
+/**
+ * 会调用 Vue.config 上配置的 errorHandler
+ */
 function globalHandleError (err, vm, info) {
   if (config.errorHandler) {
     try {

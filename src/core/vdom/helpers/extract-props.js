@@ -17,11 +17,13 @@ export function extractPropsFromVNodeData (
   // we are only extracting raw values here.
   // validation and default values are handled in the child
   // component itself.
+  // 构造函数中的 props 是指在写组件时，定义的 props，也即组件接受哪些 props，类型、默认值、校验等
   const propOptions = Ctor.options.props
   if (isUndef(propOptions)) {
     return
   }
   const res = {}
+  // 这里的 props 是使用组件时，编译后，也就是调用 h 函数时，给这个组件传入的 props，参考 h 第二个参数 VNodeData
   const { attrs, props } = data
   if (isDef(attrs) || isDef(props)) {
     for (const key in propOptions) {
