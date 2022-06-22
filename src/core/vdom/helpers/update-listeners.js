@@ -3,6 +3,8 @@
 import { warn } from 'core/util/index'
 import { cached, isUndef, isPlainObject } from 'shared/util'
 
+// 处理事件名
+// 模板在被编译的过程中，有 passive、once、capture 等修饰符的事件，事件名前会被添加上 &、~、!
 const normalizeEvent = cached((name: string): {
   name: string,
   once: boolean,
@@ -42,6 +44,7 @@ export function createFnInvoker (fns: Function | Array<Function>): Function {
   return invoker
 }
 
+// 将 on 上的事件添加到组件上，将 oldOn 上的事件从组件上移除
 export function updateListeners (
   on: Object,
   oldOn: Object,
@@ -66,10 +69,12 @@ export function updateListeners (
       )
     } else if (isUndef(old)) {
       if (isUndef(cur.fns)) {
+        // 对事件做一层处理，最终还是调用 cur，将 cur 挂载到 cur.fns 上
         cur = on[name] = createFnInvoker(cur)
       }
       add(event.name, cur, event.once, event.capture, event.passive, event.params)
     } else if (cur !== old) {
+      // 如果 cur 发生了改变，那么更新 cur 到 old.fns 上，然后更新 On 上对应的事件
       old.fns = cur
       on[name] = old
     }

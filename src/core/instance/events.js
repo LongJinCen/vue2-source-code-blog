@@ -10,10 +10,12 @@ import {
 import { updateListeners } from '../vdom/helpers/index'
 
 export function initEvents (vm: Component) {
+  // 所有的自定义事件都会传存储奥 vm._events 上
   vm._events = Object.create(null)
   vm._hasHookEvent = false
   // init parent attached events
   // 如果使用当前组件时，有传递事件，这里会进行初始化
+  // 这里是自定义事件，不是原生事件
   const listeners = vm.$options._parentListeners
   if (listeners) {
     updateComponentListeners(vm, listeners)
@@ -46,6 +48,7 @@ export function updateComponentListeners (
 
 export function eventsMixin (Vue: Class<Component>) {
   const hookRE = /^hook:/
+  // 忘 vm._events 中存储事件
   Vue.prototype.$on = function (event: string | Array<string>, fn: Function): Component {
     const vm: Component = this
     if (Array.isArray(event)) {
@@ -62,7 +65,7 @@ export function eventsMixin (Vue: Class<Component>) {
     }
     return vm
   }
-
+  // 在 vm._events 上添加一个一次性事件，先用 $on，执行后用 $off
   Vue.prototype.$once = function (event: string, fn: Function): Component {
     const vm: Component = this
     function on () {
@@ -74,6 +77,7 @@ export function eventsMixin (Vue: Class<Component>) {
     return vm
   }
 
+  // 从 vm._events 中移除该事件
   Vue.prototype.$off = function (event?: string | Array<string>, fn?: Function): Component {
     const vm: Component = this
     // all
@@ -111,7 +115,7 @@ export function eventsMixin (Vue: Class<Component>) {
     }
     return vm
   }
-
+  // 在 vm._events 上，找到 name 为 event 的事件，并依次执行
   Vue.prototype.$emit = function (event: string): Component {
     const vm: Component = this
     if (process.env.NODE_ENV !== 'production') {

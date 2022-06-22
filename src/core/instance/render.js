@@ -24,6 +24,7 @@ export function initRender (vm: Component) {
   const parentVnode = vm.$vnode = options._parentVnode // the placeholder node in parent tree
   // 父 Vnode 所在的 Vue 实例
   const renderContext = parentVnode && parentVnode.context
+  // 组件的 children 作为默认插槽，会把组件的 children 挂载到 vm.$slots 上
   vm.$slots = resolveSlots(options._renderChildren, renderContext)
   vm.$scopedSlots = emptyObject
   // bind the createElement fn to this instance
@@ -76,7 +77,8 @@ export function renderMixin (Vue: Class<Component>) {
         vm.$slots[key]._rendered = false
       }
     }
-
+    // 如果是组件，并且使用组件时，提供了具名插槽，那么编译时会把具名插槽编译到 data.scopedSlots 中
+    // 将具名插槽挂载到 vm.$scopedSlots 上
     if (_parentVnode) {
       vm.$scopedSlots = _parentVnode.data.scopedSlots || emptyObject
     }

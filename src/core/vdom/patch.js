@@ -73,7 +73,7 @@ export function createPatchFunction (backend) {
   const cbs = {}
   // 不同的平台在调用该函数时，传递各自的 nodeOps 和 modules
   const { modules, nodeOps } = backend
-
+  // 注册钩子，会在 patch 的不同阶段调用
   for (i = 0; i < hooks.length; ++i) {
     cbs[hooks[i]] = []
     for (j = 0; j < modules.length; ++j) {
@@ -198,7 +198,8 @@ export function createPatchFunction (backend) {
         /**
          * children 创建完成后，
          * 1. 如果有传递给当前 dom 节点的属性，那么会调用  src/platforms/web/runtime/modules/xxx 中定义的 create 钩子，对 data 中相应的数据
-         *  进行处理，例如当有 class 属性时，那么 style.js 中的 create 钩子就会读取 class 并添加到当前的 dom 节点上(vnode.elm)
+         *  进行处理，例如当有 class 属性时，那么 style.js 中的 create 钩子就会读取 class 并添加到当前的 dom 节点上(vnode.elm), 当有原生事件时，会 调用 
+         *  src/platforms/web/runtime/modules/events.js 中的钩子，绑定相应的原生事件
          * 2. 调用 data.hook 上的 create 钩子
          */
         if (isDef(data)) {
@@ -319,6 +320,7 @@ export function createPatchFunction (backend) {
     }
   }
 
+  // vnode 不能是一个占位符节点
   function isPatchable (vnode) {
     while (vnode.componentInstance) {
       vnode = vnode.componentInstance._vnode
@@ -428,6 +430,9 @@ export function createPatchFunction (backend) {
     }
   }
 
+  // 相同节点的情况下，更新他们的子节点
+  // diff 算法
+  // 当内层的组件使用了当前组件内的 Props 时，当前组件会手动给其注入 props
   function updateChildren (parentElm, oldCh, newCh, insertedVnodeQueue, removeOnly) {
     let oldStartIdx = 0
     let newStartIdx = 0
@@ -525,6 +530,9 @@ export function createPatchFunction (backend) {
     }
   }
 
+  // 进行 dom 更新时，如果 oldVnode 和 vnode 的根节点是一样的情况下， 会在会调用这个函数来进行 patch
+  // 这里会递归的遍历 oldVnode 和 vnode
+  // 并且会执行子组件的 prepatch 钩子，用来更新子组件的数据
   function patchVnode (oldVnode, vnode, insertedVnodeQueue, removeOnly) {
     if (oldVnode === vnode) {
       return
@@ -555,11 +563,12 @@ export function createPatchFunction (backend) {
     }
 
     let i
+    // 如果是一个组件，执行其 prepatch 钩子函数
     const data = vnode.data
     if (isDef(data) && isDef(i = data.hook) && isDef(i = i.prepatch)) {
       i(oldVnode, vnode)
     }
-
+    // 比对新旧 vnode 的 children
     const oldCh = oldVnode.children
     const ch = vnode.children
     if (isDef(data) && isPatchable(vnode)) {
@@ -732,9 +741,11 @@ export function createPatchFunction (backend) {
     } else {
       // oldVnode 是一个真实的 dom
       const isRealElement = isDef(oldVnode.nodeType)
+      // 相同根节点走这里
       if (!isRealElement && sameVnode(oldVnode, vnode)) {
         // patch existing root node
         patchVnode(oldVnode, vnode, insertedVnodeQueue, removeOnly)
+      // 不同根节点走这里
       } else {
         if (isRealElement) {
           // mounting to a real element
@@ -783,13 +794,19 @@ export function createPatchFunction (backend) {
         )
 
         // update parent placeholder node element, recursively
+        // 由于 createElement 把新的 dom 挂载到页面上，旧的节点还在，需要移除旧的节点
         if (isDef(vnode.parent)) {
+          // 拿到父的占位符节点
           let ancestor = vnode.parent
+          // 拿到一个可挂载的节点，因为如果根节点如果 vnode 是一个占位符节点，那么它是不可挂载的，
+          // 例如组件内部的根节点是一个组件，那么就需要拿到这个根组件内部的可挂载的 _vnode, 如果这个根组件内部的根节点还是一个组件
+          // 那么继续往下找，直到找到一个可挂载的 dom 节点
           const patchable = isPatchable(vnode)
           while (ancestor) {
             for (let i = 0; i < cbs.destroy.length; ++i) {
               cbs.destroy[i](ancestor)
             }
+            // 将新创建 dom 节点，赋值给父的占位符节点
             ancestor.elm = vnode.elm
             if (patchable) {
               for (let i = 0; i < cbs.create.length; ++i) {

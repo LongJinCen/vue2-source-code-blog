@@ -22,6 +22,10 @@ let uid = 0
  * and fires callback when the expression value changes.
  * This is used for both the $watch() api and directives.
  */
+/**
+ * vue 中的两个核心，一个是 watcher，一个是 dep。
+ * watcher.deps 表示这个 watcher 订阅了哪些依赖。dep.subs 表示这个 dep 被哪些 watcher 订阅。
+ */
 export default class Watcher {
   vm: Component;
   expression: string;
@@ -42,7 +46,7 @@ export default class Watcher {
 
   constructor (
     vm: Component,
-    expOrFn: string | Function,
+    expOrFn: string | Function, // 可以进行依赖收集的那个函数，如果是 computed，那么就是那个计算函数，下面的 cb 就是 null，如果是一 watch，那么这里是一个字符串，表示要观察的数据，这个会被包一层形成一个函数，下面的 cb 就是 watch 的依赖发生改变后执行的函数
     cb: Function,
     options?: ?Object,
     isRenderWatcher?: boolean
@@ -60,6 +64,7 @@ export default class Watcher {
     // options
     if (options) {
       this.deep = !!options.deep
+      // vm.$watch 注册的是一个 user watcher, computed 不是
       this.user = !!options.user
       // computed watcher 会传递 lazy 为 true
       this.lazy = !!options.lazy
@@ -83,6 +88,8 @@ export default class Watcher {
     if (typeof expOrFn === 'function') {
       this.getter = expOrFn
     } else {
+      // 对于 watch 来说，expOrFn 是一个 key，表示 watch 哪个 key, 之列的 parsePath 会返回一个函数，用作 getter，回去读取 vm 上的这个 key
+      // 并且会触发依赖收集
       this.getter = parsePath(expOrFn)
       if (!this.getter) {
         this.getter = function () {}
@@ -96,6 +103,7 @@ export default class Watcher {
     }
     // 调用 getter，进入挂载或更新流程
     // 对于 computed watcher，lazy 为 true，不会立马求值
+    // 对于 watch，会直接执行 get
     this.value = this.lazy
       ? undefined
       : this.get()
@@ -115,6 +123,7 @@ export default class Watcher {
       // computed watcher 中的 getter 是 computed 的计算函数，调用计算函数，计算 computed property 的值，并且在 getter 执行过程中，如果 computed 里面依赖了其他响应式属性
       //  那么其他响应式属性也会进行依赖收集，它们的 dep.subs 里面会将 computed watcher Push 进去，表示这个 computed watcher 订阅了响应式属性，当响应式属性派发更新时，
       // 便会重新执行 computed watcher 内部存储的 computed 计算函数
+      // 对于 watch，这个 getter 是前面通过 parsePath 包装过的，会去读取 vm 上的某个 key，从而出发 key 依赖收集，收集当前的 watcher。这里的 getter 返回 watch 的那个 key，在 vm 上的值
       value = this.getter.call(vm, vm)
     } catch (e) {
       if (this.user) {
@@ -125,6 +134,8 @@ export default class Watcher {
     } finally {
       // "touch" every property so they are all tracked as
       // dependencies for deep watching
+      // 如果加了 deep，并且 value 是一个对象，那么深度遍历这个对象，访问其每一个 key，由于这个对象是一个响应式的，所以会触发这些属性进行依赖收集
+      // 收集当前的 watch watcher 作为订阅者，这样当 watch 的这个 key 对象的深层的属性发生改变时，也会派发更新到 watch watcher
       if (this.deep) {
         traverse(value)
       }
@@ -199,6 +210,10 @@ export default class Watcher {
     // 因为 computed 计算函数的依赖不仅收集了当前 computed watcher，还会收集 render watcher，当 computed 计算函数的依赖发生改变时，会先执行 computed watcher 的 update 方法
     // 然后将这里的 dirty 标志位放开，并不会里面做重新计算，computed watcher 执行完成后，就会执行 render watcher，rende watcher 如果访问到 computed 属性，那么就会触发 computed 
     // 属性的 getter，然后由于 dirty 为 true，便会触发 watcher.evaluate() 进行计算
+
+    // 目前的实现方案针对 computed，只要 computed 的依赖发生改变，就会触发订阅其数据变更的 watcher 执行 update，最终重新渲染，首先执行的当前的 comoputed watcher，这里只
+    // 放开了标志位，没有任何处理，所以接下来便会执行渲染 watcher，并重新渲染。不过这个问题在更高版本中被修复了，修复方案是每次派发更新执行 computed watcher 时
+    // 不会像下面这样只放开标志位，而是重新计算其值，然后作对比
     if (this.lazy) {
       this.dirty = true
     } else if (this.sync) {

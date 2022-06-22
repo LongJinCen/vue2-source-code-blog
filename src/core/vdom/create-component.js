@@ -67,7 +67,7 @@ const componentVNodeHooks = {
       child.$mount(hydrating ? vnode.elm : undefined, hydrating)
     }
   },
-
+  // 组件的数据更新后，需要更新传递给子组件的 props，这样子组件也会重新渲染
   prepatch (oldVnode: MountedComponentVNode, vnode: MountedComponentVNode) {
     const options = vnode.componentOptions
     const child = vnode.componentInstance = oldVnode.componentInstance
@@ -206,9 +206,11 @@ export function createComponent (
 
   // extract listeners, since these needs to be treated as
   // child component listeners instead of DOM listeners
+  // 对于给组件传递的自定义事件，将其赋值给 listeners
   const listeners = data.on
   // replace with listeners with .native modifier
   // so it gets processed during parent component patch.
+  // 对于通过 .native 添加的原生事件，会在组件的 Patch 完成后，添加到 dom 上
   data.on = data.nativeOn
 
   if (isTrue(Ctor.options.abstract)) {

@@ -62,6 +62,7 @@ export function initState (vm: Component) {
 }
 
 function initProps (vm: Component, propsOptions: Object) {
+  // 拿到父组件传递过来的 propsData
   const propsData = vm.$options.propsData || {}
   const props = vm._props = {}
   // cache prop keys so that future props updates can iterate using Array
@@ -69,11 +70,16 @@ function initProps (vm: Component, propsOptions: Object) {
   const keys = vm.$options._propKeys = []
   const isRoot = !vm.$parent
   // root instance props should be converted
+  // prop 如果是一个原始值，那么需要在当前组件实例中通过 defineReactive 对其定义响应式
+  // prop 如果是一个对象，那么跟父组件持有一个引用，具体参考 updateChildComponent 方法。所以在 updateChildComponent 中，如果 prop
+  // 是一个对象，那么会继续调用 observe 方法对其进行响应式处理，但是父组件其实已经对该对象做过响应式处理了，所以不需要再处理。通过 toggleObserving 方法
+  // 会切换一个全局的标志位，当为 false 时，observe 会停止对传递给它的值做响应式处理
   if (!isRoot) {
     toggleObserving(false)
   }
   for (const key in propsOptions) {
     keys.push(key)
+    // 校验 prop
     const value = validateProp(key, propsOptions, propsData, vm)
     /* istanbul ignore else */
     if (process.env.NODE_ENV !== 'production') {
@@ -97,6 +103,7 @@ function initProps (vm: Component, propsOptions: Object) {
         }
       })
     } else {
+      // 响应式处理
       defineReactive(props, key, value)
     }
     // static props are already proxied on the component's prototype
@@ -204,6 +211,7 @@ function initComputed (vm: Component, computed: Object) {
     // at instantiation here.
     if (!(key in vm)) {
       // 将 computed 定义到 vm 上，方便访问
+      // 对于组件，通常会在创建组件的构造函数的时候，提前通过 defineComputed 处理 computed 
       defineComputed(vm, key, userDef)
     } else if (process.env.NODE_ENV !== 'production') {
       if (key in vm.$data) {
@@ -276,6 +284,7 @@ function createComputedGetter (key) {
   }
 }
 
+// methods 不像 data 和 Props 不需要做响应式，直接在 vm 上定义一下就可以
 function initMethods (vm: Component, methods: Object) {
   const props = vm.$options.props
   for (const key in methods) {
@@ -304,9 +313,11 @@ function initMethods (vm: Component, methods: Object) {
   }
 }
 
+// 初始化 watch
 function initWatch (vm: Component, watch: Object) {
   for (const key in watch) {
     const handler = watch[key]
+    // watch 可以是一个数组
     if (Array.isArray(handler)) {
       for (let i = 0; i < handler.length; i++) {
         createWatcher(vm, key, handler[i])
@@ -317,12 +328,16 @@ function initWatch (vm: Component, watch: Object) {
   }
 }
 
+// 初始化 watch
 function createWatcher (
   vm: Component,
+  // key, 通常是一个 Key
   expOrFn: string | Function,
+  // key 对应的函数
   handler: any,
   options?: Object
 ) {
+  // 如果 handler 是一个对象
   if (isPlainObject(handler)) {
     options = handler
     handler = handler.handler
@@ -330,6 +345,7 @@ function createWatcher (
   if (typeof handler === 'string') {
     handler = vm[handler]
   }
+  // 前面统一了参数的格式，然后调用 $watch
   return vm.$watch(expOrFn, handler, options)
 }
 
@@ -366,12 +382,15 @@ export function stateMixin (Vue: Class<Component>) {
     options?: Object
   ): Function {
     const vm: Component = this
+    // 由于可以手动直接调用 $watch，所以需要调用 createWatcher 对参数做一层统一化
     if (isPlainObject(cb)) {
       return createWatcher(vm, expOrFn, cb, options)
     }
     options = options || {}
+    // 表示这是一个 user watcher
     options.user = true
     const watcher = new Watcher(vm, expOrFn, cb, options)
+    // 如果配置了 immediate，那么立即调用 cb
     if (options.immediate) {
       cb.call(vm, watcher.value)
     }

@@ -70,6 +70,7 @@ function remove (
 }
 
 function updateDOMListeners (oldVnode: VNodeWithData, vnode: VNodeWithData) {
+  // 原生事件在编译时，会放到 data.on 下
   if (isUndef(oldVnode.data.on) && isUndef(vnode.data.on)) {
     return
   }

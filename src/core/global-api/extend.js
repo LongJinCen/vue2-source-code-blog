@@ -52,9 +52,11 @@ export function initExtend (Vue: GlobalAPI) {
     // super 指向父构造函数，当然继承后，Sub 也是一个可用的构造函数
     Sub['super'] = Super
 
+    // 注意下面的注释
     // For props and computed properties, we define the proxy getters on
     // the Vue instances at extension time, on the extended prototype. This
     // avoids Object.defineProperty calls for each instance created.
+    // 对 Props 做一个代理
     if (Sub.options.props) {
       initProps(Sub)
     }

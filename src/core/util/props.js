@@ -42,6 +42,7 @@ export function validateProp (
     }
   }
   // check default value
+  // 取默认值的时候需要对其做响应式处理，所以需要 toggleObserving 切换。因为默认值是子组件的内部的，未进行过响应式处理
   if (value === undefined) {
     value = getPropDefaultValue(vm, prop, key)
     // since the default value is a fresh copy,
@@ -81,6 +82,8 @@ function getPropDefaultValue (vm: ?Component, prop: PropOptions, key: string): a
   }
   // the raw prop value was also undefined from previous render,
   // return previous default value to avoid unnecessary watcher trigger
+  // 在组件更新的过程中，如果某个 prop，父组件未传递其值，通常来说，子组件会调用其 default 取值，但是 default 每次返回都是一个新的值
+  // 会导致修改该 prop，导致一些不必要的重新渲染，所以如果之前已经有值了，直接返回之前的值
   if (vm && vm.$options.propsData &&
     vm.$options.propsData[key] === undefined &&
     vm._props[key] !== undefined

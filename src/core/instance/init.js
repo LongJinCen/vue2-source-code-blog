@@ -104,6 +104,7 @@ export function initInternalComponent (vm: Component, options: InternalComponent
   const vnodeComponentOptions = parentVnode.componentOptions
   opts.propsData = vnodeComponentOptions.propsData
   opts._parentListeners = vnodeComponentOptions.listeners
+  // 对于组件来说，它的 render Children 通常用作默认插槽，具名插槽会被编译到 data vnode.data 属性中，不会被当做 children
   opts._renderChildren = vnodeComponentOptions.children
   opts._componentTag = vnodeComponentOptions.tag
 

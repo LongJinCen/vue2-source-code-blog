@@ -243,6 +243,7 @@ export function mountComponent (
   return vm
 }
 
+// 更新流程，更新子组件的数据
 export function updateChildComponent (
   vm: Component,
   propsData: ?Object,
@@ -278,13 +279,16 @@ export function updateChildComponent (
   vm.$listeners = listeners || emptyObject
 
   // update props
+  // 更新子组件的 prop
   if (propsData && vm.$options.props) {
+    // 切断响应式
     toggleObserving(false)
     const props = vm._props
     const propKeys = vm.$options._propKeys || []
     for (let i = 0; i < propKeys.length; i++) {
       const key = propKeys[i]
       const propOptions: any = vm.$options.props // wtf flow?
+      // 重新校验 && 更新 props
       props[key] = validateProp(key, propOptions, propsData, vm)
     }
     toggleObserving(true)

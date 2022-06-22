@@ -11,6 +11,7 @@ export function renderSlot (
   props: ?Object,
   bindObject: ?Object
 ): ?Array<VNode> {
+  // 先取具名插槽
   const scopedSlotFn = this.$scopedSlots[name]
   let nodes
   if (scopedSlotFn) { // scoped slot
@@ -22,10 +23,13 @@ export function renderSlot (
           this
         )
       }
+      // 如果是作用域插槽，那么会把 props 传递给作用域插槽
       props = extend(extend({}, bindObject), props)
     }
+    // 拿到插槽的节点，具名插槽被编译后是一个函数
     nodes = scopedSlotFn(props) || fallback
   } else {
+    // 如果没有具名插槽，就取默认插槽
     const slotNodes = this.$slots[name]
     // warn duplicate slot usage
     if (slotNodes) {
