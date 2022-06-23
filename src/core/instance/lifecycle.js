@@ -119,7 +119,7 @@ export function lifecycleMixin (Vue: Class<Component>) {
       vm._watcher.update()
     }
   }
-
+  // 销毁组件
   Vue.prototype.$destroy = function () {
     const vm: Component = this
     if (vm._isBeingDestroyed) {
@@ -128,15 +128,19 @@ export function lifecycleMixin (Vue: Class<Component>) {
     callHook(vm, 'beforeDestroy')
     vm._isBeingDestroyed = true
     // remove self from parent
+    // 第一步，把该实例从父组件的 children 中移除
     const parent = vm.$parent
     if (parent && !parent._isBeingDestroyed && !vm.$options.abstract) {
       remove(parent.$children, vm)
     }
     // teardown watchers
+    // 处理当前组件的 watcher
+    // 从 vm._watchers 中移除移除当前的渲染 watcher，并且移除其对所有的 dep 的订阅
     if (vm._watcher) {
       vm._watcher.teardown()
     }
     let i = vm._watchers.length
+    // 接着处理所有的 watcher
     while (i--) {
       vm._watchers[i].teardown()
     }
@@ -148,6 +152,7 @@ export function lifecycleMixin (Vue: Class<Component>) {
     // call the last hook...
     vm._isDestroyed = true
     // invoke destroy hooks on current rendered tree
+    // 移除 dom
     vm.__patch__(vm._vnode, null)
     // fire destroyed hook
     callHook(vm, 'destroyed')

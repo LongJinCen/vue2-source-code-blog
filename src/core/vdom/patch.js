@@ -226,6 +226,7 @@ export function createPatchFunction (backend) {
     // 组件的 data.hook 是有值的，这里的 vnode 是之前创建的一个占位符 vnode，包含了 componentOptions 和 data.hook 这两个比较重要的属性
     let i = vnode.data
     if (isDef(i)) {
+      // 是否是一个 keepAlive 组件，并且有 componentInstance 这个实例，表示之前创建过并渲染过，这里不是指 <keep-alive></keep-alive> 这个组件，只有被它包裹的组件才会有 keepAlive 这个标志
       const isReactivated = isDef(vnode.componentInstance) && i.keepAlive
       // 进入组件的 init 方法，开始对组件进行实例化，在为某个组件创建 vnode 时，如果发现有组件 A，那么会为该组件 A 创建一个占位符 vnode，并且会为 A 创建一个新的构造函数，方便对其进行实例化
       if (isDef(i = i.hook) && isDef(i = i.init)) {
