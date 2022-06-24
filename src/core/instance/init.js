@@ -36,8 +36,8 @@ export function initMixin (Vue: Class<Component>) {
       // internal component options needs special treatment.
       initInternalComponent(vm, options)
     } else {
-      // 把组件中我们写的东西，全部都挂载到 $options 上去了，原型上任何方法都可通过 this.$options 访问到我们传递的配置
-      // $options 中包含了我们在组件中写的配置、Vue.options 上的一些东西
+      // 把 new Vue 中我们写的东西，全部都挂载到 $options 上去了，原型上任何方法都可通过 this.$options 访问到我们传递的配置
+      // $options 中包含了我们 new Vue(options) 中的 options、Vue.options 上的一些东西
       vm.$options = mergeOptions(
         resolveConstructorOptions(vm.constructor),
         options || {},

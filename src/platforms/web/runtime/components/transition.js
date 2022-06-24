@@ -82,6 +82,7 @@ export default {
   abstract: true,
 
   render (h: Function) {
+    // 拿到通过通过 <transition></transition> 包裹的子节点
     let children: any = this.$slots.default
     if (!children) {
       return
@@ -146,11 +147,11 @@ export default {
       : isPrimitive(child.key)
         ? (String(child.key).indexOf(id) === 0 ? child.key : id + child.key)
         : child.key
-
+    // 把 transition 组件上面的 props 和 listeners 都赋值给 child.data.transition 上
     const data: Object = (child.data || (child.data = {})).transition = extractTransitionData(this)
     const oldRawChild: VNode = this._vnode
     const oldChild: VNode = getRealChild(oldRawChild)
-
+    // 标记 v-show
     // mark v-show
     // so that the transition module can hand over the control to the directive
     if (child.data.directives && child.data.directives.some(d => d.name === 'show')) {
